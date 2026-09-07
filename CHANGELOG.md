@@ -4,6 +4,25 @@ All notable changes to `dcardenasl/ci4-api-core` will be documented here. Format
 
 ## [Unreleased]
 
+## [1.6.1] — 2026-09-07
+
+### Fixed
+
+- **`Filters\SearchQueryApplier::applyProfile()`** — `searchMinLength` no longer suppresses the
+  whole-value buckets of a profile. That floor exists to stop 1-2 character fragments being matched
+  against free text, which says nothing about a two-character query against a two-character column:
+  with the default of 3, a `prefix: ['code']` bucket over ISO language codes could never fire, and the
+  screen silently listed every row instead of filtering. The floor now gates `fulltext` and `like`; a
+  query below it keeps `prefix` and `exact` (see `SearchProfile::wholeValueOnly()`), and still skips
+  entirely when the profile declares neither — the previous behaviour for a pure free-text profile.
+  Derived from what the profile declares, so a model with a short-code column needs no configuration
+  and no per-model exception.
+
+### Added
+
+- **`Filters\SearchProfile::wholeValueOnly()`** — the profile reduced to its `prefix`/`exact` buckets,
+  or null when it has none.
+
 ## [1.6.0] — 2026-09-07
 
 ### Added

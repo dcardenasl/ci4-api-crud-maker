@@ -165,4 +165,30 @@ final class SearchQueryApplierTest extends TestCase
         $this->assertSame(['a', 'b'], $profile->fulltext);
         $this->assertSame([], $profile->like);
     }
+    public function testWholeValueOnlyKeepsTheLookupBucketsAndDropsFreeText(): void
+    {
+        // `searchMinLength` exists to stop 1-2 character fragments matching
+        // free text. It has nothing to say about a two-letter code searched in
+        // a two-letter column, so a query below the floor keeps the
+        // whole-value buckets and drops the rest.
+        $profile = (new SearchProfile(
+            fulltext: ['first_name'],
+            like: ['email'],
+            prefix: ['code'],
+            exact: ['slug'],
+        ))->wholeValueOnly();
+
+        $this->assertNotNull($profile);
+        $this->assertSame([], $profile->fulltext);
+        $this->assertSame([], $profile->like);
+        $this->assertSame(['code'], $profile->prefix);
+        $this->assertSame(['slug'], $profile->exact);
+    }
+
+    public function testWholeValueOnlyIsNullForAPureFreeTextProfile(): void
+    {
+        // Nothing left to search below the floor, so the caller skips entirely
+        // — the behaviour such a profile had before.
+        $this->assertNull((new SearchProfile(fulltext: ['bio'], like: ['email']))->wholeValueOnly());
+    }
 }

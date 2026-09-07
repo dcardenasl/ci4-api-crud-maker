@@ -91,6 +91,26 @@ final class SearchProfile
     }
 
     /**
+     * Only the buckets that look up a whole value — `prefix` and `exact` —
+     * or null when the profile has none.
+     *
+     * How a query shorter than `searchMinLength` is handled: that floor is
+     * about not matching fragments against free text, so it gates `fulltext`
+     * and `like` and has nothing to say about a two-letter code being searched
+     * in a two-letter column. Null means there is nothing left to search and
+     * the caller should skip entirely, which is the behaviour a profile of
+     * pure free text had before.
+     */
+    public function wholeValueOnly(): ?self
+    {
+        if ($this->prefix === [] && $this->exact === []) {
+            return null;
+        }
+
+        return new self(prefix: $this->prefix, exact: $this->exact);
+    }
+
+    /**
      * Every column the profile touches, in bucket order.
      *
      * @return list<string>

@@ -71,7 +71,14 @@ propósito). `CORE-04` y `CORE-06` de `../teatromuseo/TASKS.md` no requieren cam
   workaround: los 19 modelos vuelven al trait del paquete y los 18 servicios a `BaseCrudService`, sin
   clase puente. Esa eliminación es la prueba de que la delegación de `QueryBuilder` era la pieza que
   faltaba.
-- **Pendiente**: publicar `v1.6.0` y subir el constraint en los consumidores.
+- **v1.6.0 publicada** por David; `ci4-website-suite` ya consume el paquete real (`^1.6`).
+- **Seguimiento (CORE-028, incluido aquí)**: `searchMinLength` ahogaba los buckets de valor completo.
+  El umbral existe para no casar fragmentos de 1-2 caracteres contra texto libre, y no dice nada sobre
+  buscar dos caracteres en una columna de dos caracteres: con el default de 3, `prefix: ['code']` sobre
+  códigos ISO no podía dispararse nunca y la pantalla listaba todo en silencio. Ahora el umbral filtra
+  `fulltext`/`like` y respeta `prefix`/`exact` (`SearchProfile::wholeValueOnly()`), deducido del propio
+  perfil — sin configuración ni excepción por modelo. Verificado en vivo: `es`→[es], `en`→[en],
+  `Espa`→[es], `Engl`→[en], `zzz`→[]. **Pendiente: publicar `v1.6.1`.**
 
 
 ### CMS-ACCESS-01 — `AbstractPermissionFilter` admite lista de códigos alternativos · Released v1.5.0
