@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Tests\Unit\Filters;
 
 use CodeIgniter\Database\BaseBuilder;
+use dcardenasl\Ci4ApiCore\Filters\SearchProfile;
 use dcardenasl\Ci4ApiCore\Filters\SearchQueryApplier;
+use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -80,6 +82,87 @@ final class SearchQueryApplierTest extends TestCase
             'less than'              => ['<less', ' less'],
             'combined operators'     => ['+best -worst', ' best  worst'],
             'plain query unchanged'  => ['hello world', 'hello world'],
+            // `@` opens Boolean Mode's @distance operator, so an ordinary
+            // email address was a fatal syntax error and the request 500'd.
+            'at sign'                => ['admin@example.com', 'admin example.com'],
         ];
+    }
+    public function testProfileAppliesEachBucketInsideOneGroup(): void
+    {
+        // Every bucket must land in a single group, or the search widens a
+        // constraint the caller already applied.
+        $builder = $this->createMock(BaseBuilder::class);
+        $builder->expects($this->once())->method('groupStart')->willReturnSelf();
+        $builder->expects($this->once())->method('groupEnd')->willReturnSelf();
+        $builder->expects($this->once())->method('like')->with('email', 'foo')->willReturnSelf();
+        $builder->expects($this->once())->method('orLike')->with('code', 'foo', 'after')->willReturnSelf();
+        $builder->expects($this->once())->method('orWhere')->with('slug', 'foo')->willReturnSelf();
+
+        SearchQueryApplier::applyProfile(
+            $builder,
+            'foo',
+            new SearchProfile(like: ['email'], prefix: ['code'], exact: ['slug']),
+            'widgets',
+        );
+    }
+
+    public function testProfileIsANoOpForAnEmptyQuery(): void
+    {
+        $builder = $this->createMock(BaseBuilder::class);
+        $builder->expects($this->never())->method('groupStart');
+
+        SearchQueryApplier::applyProfile($builder, '   ', new SearchProfile(like: ['name']), 'widgets');
+    }
+
+    public function testProfileMustDeclareAtLeastOneColumn(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        new SearchProfile();
+    }
+
+    public function testProfileRejectsColumnsOutsideTheModelWhitelist(): void
+    {
+        $profile = new SearchProfile(fulltext: ['name'], like: ['password_hash']);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('password_hash');
+
+        $profile->assertWhitelisted(['name', 'email']);
+    }
+
+    public function testProfileAcceptsWhitelistedColumnsAndKeepsBucketOrder(): void
+    {
+        $profile = new SearchProfile(fulltext: ['first_name', 'last_name'], like: ['email']);
+
+        $profile->assertWhitelisted(['email', 'first_name', 'last_name']);
+
+        $this->assertSame(['first_name', 'last_name', 'email'], $profile->columns());
+    }
+
+    public function testWithoutFulltextFoldsNaturalLanguageColumnsIntoLike(): void
+    {
+        // How the `searchUseFulltext` kill switch is honoured without a model
+        // being able to override it.
+        $profile = (new SearchProfile(fulltext: ['bio'], like: ['email'], prefix: ['code']))->withoutFulltext();
+
+        $this->assertSame([], $profile->fulltext);
+        $this->assertSame(['email', 'bio'], $profile->like);
+        $this->assertSame(['code'], $profile->prefix);
+    }
+
+    public function testWithoutFulltextIsIdentityWhenThereIsNoFulltextBucket(): void
+    {
+        $profile = new SearchProfile(like: ['email']);
+
+        $this->assertSame($profile, $profile->withoutFulltext());
+    }
+
+    public function testFulltextOnlyPreservesTheBehaviourOfModelsWithoutAProfile(): void
+    {
+        $profile = SearchProfile::fulltextOnly(['a', 'b']);
+
+        $this->assertSame(['a', 'b'], $profile->fulltext);
+        $this->assertSame([], $profile->like);
     }
 }

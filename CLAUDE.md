@@ -29,7 +29,7 @@ For release history see `CHANGELOG.md`. Current state of this package:
 - **HTTP filters (concrete)**: 9 filters — `CorrelationIdFilter`, `CorsFilter`, `DeprecationHeadersFilter`, `FeatureToggleFilter`, `IdempotencyFilter`, `LocaleFilter`, `MaintenanceFilter`, `RequestLoggingFilter`, `SecurityHeadersFilter`
 - **HTTP filters (abstract)**: 3 abstract bases consumers extend with their JWT/IAM concretions — `AbstractJwtAuthFilter`, `AbstractPermissionFilter`, `AbstractThrottleFilter`
 - **IAM**: `Contracts\Iam\PermissionResolverInterface`, `Contracts\Iam\ApplicationPermissionResolverInterface`, `Contracts\SecurityAuditLoggerInterface`, `Services\Iam\AbstractIamAuthorizationService`
-- **Query filters**: `FilterParser`, `FilterOperatorApplier`, `SearchQueryApplier`, `QueryBuilder`
+- **Query filters**: `FilterParser`, `FilterOperatorApplier`, `SearchQueryApplier`, `SearchProfile`, `FulltextIndexInspector`, `QueryBuilder`
 - **Logging / Monitoring / Queue**: `JsonFormatter`, `MonologHandler`, `HealthChecker`, `Queue\Job`, `QueueManager`, `SyncQueueManager`, `WriteAuditLogJob`, `LogRequestJob`
 - **Audit chain**: `AuditService`, `AuditWriter`, `AuditPayloadSanitizer`, `AuditEventDTO`, `PayloadResponseDTO`
 - **Models**: `BaseAuditableModel`, `BaseTranslationModel`, `BasePublicSlugModel`, `Auditable` trait, `Filterable`, `Searchable` traits, `DecimalCast`

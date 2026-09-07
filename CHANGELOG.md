@@ -4,6 +4,49 @@ All notable changes to `dcardenasl/ci4-api-core` will be documented here. Format
 
 ## [Unreleased]
 
+## [1.6.0] — 2026-09-07
+
+### Added
+
+- **`Filters\SearchProfile`** — a model can now state how each of its searchable columns is searched:
+  `fulltext` (natural language), `like` (values carrying punctuation — emails, slugs, URLs, keys),
+  `prefix` (short codes that fall below `innodb_ft_min_token_size`) and `exact`. Each bucket degrades
+  on its own. Declare it by overriding `Models\Traits\Searchable::searchProfile()`; a model that
+  declares nothing keeps the previous behaviour.
+- **`Filters\FulltextIndexInspector`** — reads `information_schema` to answer whether a connection has
+  a FULLTEXT index covering exactly a given column list, memoised per connection+table. MySQL only
+  uses such an index on an exact column match, and rejects the whole statement otherwise.
+- **`Filters\SearchQueryApplier::applyProfile()`** — applies a profile inside a single
+  `groupStart()`/`groupEnd()`, so a search never widens a constraint the caller already applied.
+
+### Fixed
+
+- **`Filters\SearchQueryApplier`** — `@` is now stripped from Boolean Mode input. It opens MySQL's
+  `@distance` operator, so `MATCH(email, …) AGAINST('admin@example.com' IN BOOLEAN MODE)` was a syntax
+  error: any consumer with an email column among its `$searchableFields` returned HTTP 500 for a
+  perfectly ordinary search term.
+- **`Filters\SearchQueryApplier`** — a `MATCH()` with no index covering its columns now degrades to
+  LIKE instead of failing the request. MySQL answers that case with "Can't find FULLTEXT index matching
+  the column list" and rejects the statement, so a consumer whose index migration had not run lost the
+  whole list screen rather than getting a slower query.
+- **`Filters\SearchQueryApplier`** — a query made entirely of Boolean Mode operators no longer
+  sanitises down to `AGAINST('')`, which matches every row; it degrades to LIKE so a filter narrows
+  instead of widening.
+- **`Filters\SearchQueryApplier`** — FULLTEXT terms get a trailing `*` per word, so incremental
+  filtering works. Without it these were exact word matches and a filter box typed one character at a
+  time showed nothing until the final keystroke.
+- **`Filters\QueryBuilder::search()`** — now delegates to the model's own `search()` instead of
+  re-deriving the field list and calling the applier itself. The two implementations had drifted: a
+  model declaring a profile was honoured through `Model::search()` and silently ignored on the
+  pagination path `Repositories\BaseRepository::paginateCriteria()` takes.
+
+### Compatibility
+
+`SearchQueryApplier::apply()`, `applyFulltext()`, `applyLike()` and `sanitizeFulltextQuery()` keep their
+signatures. A consumer that declares no profile sees the same queries as before, minus the two failure
+modes above. `sanitizeFulltextQuery()` still only strips operators — the `*` is added by the internal
+term builder, not by the public sanitiser.
+
 ## [1.5.1] — 2026-08-21
 
 ### Fixed
