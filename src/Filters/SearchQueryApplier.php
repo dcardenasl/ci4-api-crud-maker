@@ -90,8 +90,23 @@ class SearchQueryApplier
             return;
         }
 
+        // `searchMinLength` exists to stop 1-2 character fragments from being
+        // matched against free text. It is the wrong rule for a short-code
+        // column: for `prefix`/`exact` buckets a two-character query is not a
+        // fragment, it is the whole value — ISO language codes are always two
+        // characters, so a global floor of 3 made the Languages filter
+        // impossible to use and silently listed everything instead.
+        //
+        // Derive the rule from what the profile declares rather than applying
+        // one number blindly: the floor gates the free-text buckets, and
+        // whole-value lookups always run. A model that declares a short-code
+        // column gets this without configuring anything.
         if (strlen($query) < ApiConfigFacade::int('searchMinLength', 0)) {
-            return;
+            $profile = $profile->wholeValueOnly();
+
+            if ($profile === null) {
+                return;
+            }
         }
 
         // The deployment-wide kill switch, applied at the single point every
