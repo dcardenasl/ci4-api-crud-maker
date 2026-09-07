@@ -78,7 +78,8 @@ propósito). `CORE-04` y `CORE-06` de `../teatromuseo/TASKS.md` no requieren cam
   códigos ISO no podía dispararse nunca y la pantalla listaba todo en silencio. Ahora el umbral filtra
   `fulltext`/`like` y respeta `prefix`/`exact` (`SearchProfile::wholeValueOnly()`), deducido del propio
   perfil — sin configuración ni excepción por modelo. Verificado en vivo: `es`→[es], `en`→[en],
-  `Espa`→[es], `Engl`→[en], `zzz`→[]. **Pendiente: publicar `v1.6.1`.**
+  `Espa`→[es], `Engl`→[en], `zzz`→[]. **Publicado como `v1.6.1`**; `ci4-website-suite` consume `^1.6`
+  desde Packagist (lock en `v1.6.1`), sin path repo. CORE-027 cerrado.
 
 
 ### CMS-ACCESS-01 — `AbstractPermissionFilter` admite lista de códigos alternativos · Released v1.5.0
