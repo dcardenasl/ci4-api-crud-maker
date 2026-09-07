@@ -32,6 +32,48 @@ propósito). `CORE-04` y `CORE-06` de `../teatromuseo/TASKS.md` no requieren cam
 
 ## ✅ Completadas
 
+### CORE-027 — Perfiles de búsqueda declarativos por modelo (`SearchProfile`)
+
+- **Por qué**: la auditoría funcional de `ci4-website-suite` (2026-09-07) encontró dos listados del
+  panel devolviendo HTTP 500, ambos por el mismo camino de este paquete:
+  - `MATCH(email, first_name, last_name) AGAINST('admin@example.com' IN BOOLEAN MODE)` — `@` abre el
+    operador `@distance` de MySQL, así que una dirección corriente es un error de sintaxis;
+  - `MATCH(code, name, native_name)` sobre una tabla sin índice FULLTEXT que cubriera esas columnas —
+    MySQL rechaza la sentencia entera con "Can't find FULLTEXT index matching the column list".
+  `SearchQueryApplier` mete todos los `$searchableFields` en un solo `MATCH()`, sin distinguir qué
+  columna admite qué trato y sin degradación cuando el índice no existe. Es un fallo del paquete, no
+  del consumidor: cualquier proyecto con un email o un código corto entre sus campos buscables lo
+  hereda.
+- **Qué**: contrato declarativo por modelo. `SearchProfile` describe qué columnas se buscan con
+  FULLTEXT, cuáles con LIKE, cuáles por prefijo anclado y cuáles exactas; cada grupo degrada por su
+  cuenta. `FulltextIndexInspector` consulta `information_schema` y elige MATCH sólo cuando existe un
+  índice que cubre exactamente esa lista de columnas.
+- **Además**: `QueryBuilder::search()` reimplementaba lo que hace `Searchable::search()` en vez de
+  delegar en el modelo, así que un modelo con perfil quedaba honrado por `Model::search()` e ignorado
+  por `BaseRepository::paginateCriteria()`. Pasa a delegar: una sola implementación.
+- **Compatibilidad**: `SearchQueryApplier::apply()` mantiene su firma. Un modelo que no declara perfil
+  se comporta igual que antes, salvo que ahora degrada a LIKE en lugar de fallar cuando falta el
+  índice, y que el saneado cubre `@`. Ambos son correcciones de defecto, no cambios de contrato.
+- **Hecho**: `Filters\SearchProfile` (value object con `fulltext`/`like`/`prefix`/`exact`,
+  `withoutFulltext()`, `assertWhitelisted()`), `Filters\FulltextIndexInspector` (consulta
+  `information_schema`, memoiza por conexión+tabla), `SearchQueryApplier::applyProfile()` como camino
+  único, `Models\Traits\Searchable::searchProfile()`/`getSearchProfile()`, y
+  `QueryBuilder::search()` delegando en el modelo.
+- **Correcciones de defecto que hereda todo consumidor sin declarar nada**: `@` saneado (abría
+  `@distance` y hacía de un email un error de sintaxis), degradación a LIKE cuando ningún índice cubre
+  las columnas (MySQL rechazaba la sentencia entera), consulta sólo-operadores que degradaba a
+  `AGAINST('')` (casaba con todo), y `*` por término para que el filtrado incremental funcione.
+- **Verificado**: suite completa 362/362 (Unit + Integration + Database), PHPStan nivel 8 sin errores,
+  CS-Fixer limpio. 9 tests nuevos en `tests/Database/SearchProfileTest.php` contra MySQL real —
+  ninguno de los fallos originales era reproducible sin motor.
+- **Consumidor**: `ci4-website-suite` validó el contrato antes de subirlo (había implementado una copia
+  local por no poder tocar `vendor/`). Al adoptar el paquete borró 5 clases y 38 ediciones de
+  workaround: los 19 modelos vuelven al trait del paquete y los 18 servicios a `BaseCrudService`, sin
+  clase puente. Esa eliminación es la prueba de que la delegación de `QueryBuilder` era la pieza que
+  faltaba.
+- **Pendiente**: publicar `v1.6.0` y subir el constraint en los consumidores.
+
+
 ### CMS-ACCESS-01 — `AbstractPermissionFilter` admite lista de códigos alternativos · Released v1.5.0
 - **Qué**: `before()` trata `$arguments` como una lista de códigos alternativos en vez de leer solo
   `$arguments[0]` — el caller pasa si tiene cualquiera de los códigos listados (o el bypass de superadmin).
@@ -66,7 +108,10 @@ propósito). `CORE-04` y `CORE-06` de `../teatromuseo/TASKS.md` no requieren cam
   `testBlankLeadingEntryIsIgnoredAndTheRealCodeStillMatches`) — 17/17 verdes; `composer analyse`/`cs-check`
   limpios; parche verificado en vivo contra el consumidor real (vendor de `teatromuseo-cms-domain` parcheado
   temporalmente, `PermissionFilterTest` completo 6/6 verde, vendor restaurado a v1.5.0 sin dejar el lockfile
-  inconsistente). Pendiente: publicar `v1.5.1` y subir el constraint de `teatromuseo-cms-domain`.
+  inconsistente). **Released v1.5.1** — `teatromuseo-cms-domain` actualizado (`composer update
+  dcardenasl/ci4-api-core`, ya cubierto por su constraint `^1.5`) y verificado contra la versión real
+  publicada: `PermissionFilterTest` 6/6, suite completa 577/577 tests / 6.202 assertions (1 skip
+  preexistente sin relación), PHPStan 304/304 sin errores. `CMS-ACCESS-01` queda completamente cerrado.
 
 ### CORE-026 — `FieldsetValidator::validate()` lanza `ValidationException` (422) en vez de `\InvalidArgumentException`
 - **Qué**: `FieldsetValidator::validate()` (`src/Support/FieldsetValidator.php`) ahora lanza

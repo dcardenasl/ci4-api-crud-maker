@@ -96,6 +96,18 @@ class QueryBuilder
     {
         $this->searchQuery = $query;
 
+        // The model owns how it is searched. This used to re-derive the field
+        // list from `$searchableFields` and call the applier itself, which meant
+        // a model declaring a SearchProfile was honoured through
+        // `Model::search()` and silently ignored on the pagination path that
+        // `BaseRepository::paginateCriteria()` takes — two implementations of
+        // the same policy, free to drift. Delegate instead.
+        if (method_exists($this->model, 'search')) {
+            $this->model->search($query);
+
+            return $this;
+        }
+
         $searchableFields = [];
 
         if (property_exists($this->model, 'searchableFields')) {
